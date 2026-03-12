@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AI-Assistant"
+version = "0.1.0"
+description = "This is a local AI Assistant called Intel that can come in handy for different desktop tasks."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "Maksym Shevtsov", email = "max.shvtsv@gmail.com"},
+]
+
+dependencies = [
+    "ollama>=0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
