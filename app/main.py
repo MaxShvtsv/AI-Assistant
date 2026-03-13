@@ -1,5 +1,6 @@
 """Main entry point for AI Assistant with wake word support."""
 
+import os
 from pathlib import Path
 from typing import Callable
 
@@ -12,6 +13,9 @@ from voice.wakeword.openwakeword_detector import OpenWakeWordDetector
 
 BASE_INPUT_DIR = Path(r"D:\Desktop\Development\AI-Assistant\data\input")
 COMMAND_AUDIO_PATH = BASE_INPUT_DIR / "command.wav"
+WAKEWORD_PHRASE = os.getenv("INTEL_WAKEWORD_PHRASE", "Intel")
+WAKEWORD_MODEL_KEY = os.getenv("INTEL_WAKEWORD_MODEL_KEY", "assistant")
+WAKEWORD_MODEL_PATH = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
 
 
 stt = FasterWhisperSTT(
@@ -31,7 +35,11 @@ def recognize_speech_from_command_audio() -> str:
     wav_path = record_command_until_silence(
         output_path=str(COMMAND_AUDIO_PATH),
         sample_rate=16000,
+        blocksize=1024,
+        speech_threshold=650,
         silence_threshold=400,
+        min_speech_duration_sec=0.25,
+        start_timeout_sec=4.0,
         silence_duration_sec=1.0,
         max_duration_sec=8.0,
     )
@@ -78,13 +86,15 @@ def main() -> None:
     print("Type 'exit' in text mode to quit.")
 
     detector = OpenWakeWordDetector(
-        wakeword_name="assistant",
+        wakeword_name=WAKEWORD_MODEL_KEY,
         threshold=0.5,
+        model_path=WAKEWORD_MODEL_PATH,
+        download_models=WAKEWORD_MODEL_PATH is None,
     )
 
     listener = WakeWordListener(
         detector=detector,
-        wakeword_name="assistant",
+        wakeword_name=WAKEWORD_PHRASE,
         on_wake=build_wake_handler(assistant),
         config=WakeWordConfig(
             sample_rate=16000,
@@ -92,8 +102,15 @@ def main() -> None:
             dtype="int16",
             blocksize=1280,
             detection_threshold=0.5,
+            cooldown_sec=2.5,
         ),
     )
+
+    if WAKEWORD_PHRASE.lower() != WAKEWORD_MODEL_KEY.lower() and not WAKEWORD_MODEL_PATH:
+        print(
+            "[WakeWord] Warning: activation phrase and detector model key differ. "
+            "For the phrase 'Intel' you usually need a custom openWakeWord model."
+        )
 
     try:
         while True:
@@ -115,7 +132,10 @@ def main() -> None:
                     print(f"[Error] Assistant failed to process text: {exc}")
 
             elif mode == "w":
-                print("[WakeWord] Listening continuously. Press Ctrl+C to stop wake word mode.")
+                print(
+                    f"[WakeWord] Listening continuously for '{WAKEWORD_PHRASE}'. "
+                    "Press Ctrl+C to stop wake word mode."
+                )
                 try:
                     listener.start()
                 except KeyboardInterrupt:

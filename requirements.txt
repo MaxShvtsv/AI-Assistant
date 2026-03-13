@@ -1,4 +1,6 @@
+numpy>=1.26
 ollama>=0.6
 faster-whisper==1.2.1
+scipy>=1.11
 sounddevice==0.5.5
 openwakeword==0.6.0

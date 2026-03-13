@@ -2,18 +2,19 @@ from typing import Optional
 import subprocess
 from pathlib import Path
 
+
 def open_explorer(path: Optional[str] = None) -> str:
     """Open Windows Explorer. If path is provided, open that location."""
     if path:
-        p = Path(path)
+        p = Path(path).expanduser()
         if not p.exists():
-            return "Given path does not exists"
+            return f"Path does not exist: {p}"
 
-        subprocess.Popen(["explorer", str(p)])
-        return f"Opening Explorer at {path}"
+        subprocess.Popen(["explorer.exe", str(p)])
+        return f"Opening Explorer at {p}"
 
-    subprocess.Popen(["explorer"])
-    return "Opening File Exporer"
+    subprocess.Popen(["explorer.exe"])
+    return "Opening File Explorer"
 
 
 def list_dir(path: Optional[str] = None) -> str:
@@ -21,7 +22,7 @@ def list_dir(path: Optional[str] = None) -> str:
     if not path:
         return "Path was not provided"
 
-    p = Path(path)
+    p = Path(path).expanduser()
 
     if not p.exists():
         return "Path does not exist"
@@ -34,7 +35,7 @@ def list_dir(path: Optional[str] = None) -> str:
     if not objects:
         return "Directory is empty"
 
-    return "Directory contains:\n" + "\n".join(objects[:50])
+    return "Directory contains:\n" + "\n".join(sorted(objects)[:50])
 
 
 def create_folder(path: Optional[str] = None, folder_name: Optional[str] = None) -> str:
@@ -45,7 +46,7 @@ def create_folder(path: Optional[str] = None, folder_name: Optional[str] = None)
     if not folder_name:
         return "Folder name was not provided"
 
-    p = Path(path)
+    p = Path(path).expanduser()
 
     if not p.exists():
         return "Path does not exist"

@@ -17,6 +17,7 @@ class WakeWordConfig:
     dtype: str = "int16"
     blocksize: int = 1280
     detection_threshold: float = 0.5
+    cooldown_sec: float = 2.0
 
 
 class WakeWordListener:
@@ -34,11 +35,14 @@ class WakeWordListener:
 
         self._audio_queue: queue.Queue[np.ndarray] = queue.Queue()
         self._stop_event = threading.Event()
+        self._handling_wake = threading.Event()
         self._cooldown_until = 0.0
 
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         if status:
             print(f"[wakeword] audio status: {status}")
+        if self._handling_wake.is_set():
+            return
         self._audio_queue.put(indata.copy())
 
     def start(self) -> None:
@@ -73,8 +77,15 @@ class WakeWordListener:
 
                 if score >= self.config.detection_threshold:
                     print(f"[wakeword] detected '{self.wakeword_name}' with score={score:.3f}")
-                    self._cooldown_until = time.time() + 2.0
-                    self.on_wake()
+                    self._cooldown_until = time.time() + self.config.cooldown_sec
+                    self._handling_wake.set()
+                    self._clear_audio_queue()
+
+                    try:
+                        self.on_wake()
+                    finally:
+                        self._clear_audio_queue()
+                        self._handling_wake.clear()
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -85,4 +96,14 @@ class WakeWordListener:
         if isinstance(predictions, dict):
             return float(predictions.get(self.wakeword_name, 0.0))
 
+        if isinstance(predictions, (int, float)):
+            return float(predictions)
+
         return 0.0
+
+    def _clear_audio_queue(self) -> None:
+        while True:
+            try:
+                self._audio_queue.get_nowait()
+            except queue.Empty:
+                return

@@ -2,8 +2,9 @@ import json
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools.schema import TOOLS_SCHEMA
 from llm.ollama_client import OllamaClient
+from tools.registry import TOOLS_REGISTRY
+from tools.schema import TOOLS_SCHEMA
 
 
 @dataclass
@@ -28,41 +29,53 @@ class ToolSelector:
         except Exception:
             return ToolDecision(
                 use_tool=False,
-                response="Could not regognize the command",
+                response="Не удалось распознать команду.",
+                raw_output=raw,
+            )
+
+        use_tool = bool(data.get("use_tool", False))
+        tool_name = data.get("tool")
+        args = data.get("args", {})
+
+        if not isinstance(args, dict):
+            args = {}
+
+        if use_tool and tool_name not in TOOLS_REGISTRY:
+            return ToolDecision(
+                use_tool=False,
+                response="Я не смог подобрать подходящий инструмент.",
                 raw_output=raw,
             )
 
         return ToolDecision(
-            use_tool=data.get("use_tool", False),
-            tool=data.get("tool"),
-            args=data.get("args", {}),
+            use_tool=use_tool,
+            tool=tool_name,
+            args=args,
             response=data.get("response"),
             raw_output=raw,
         )
 
     def _build_system_prompt(self) -> str:
         return (
-            "Ты - локальный помощник под названием Intel.\n"
-            "Твоя задача — решить, требует ли запрос пользователя использования одного из доступных инструментов.\n\n"
+            "Ты локальный помощник под названием Intel.\n"
+            "Твоя задача - решить, нужно ли использовать один из доступных инструментов.\n\n"
             "Возвращай только валидный JSON.\n"
             "Не используй markdown.\n"
             "Не добавляй пояснения.\n"
             "Не добавляй текст до или после JSON.\n\n"
-            "Если необходимо использовать инструмент, возвращай именно этот формат:\n"
+            "Если нужен инструмент, верни именно такой формат:\n"
             '{"use_tool": true, "tool": "tool_name", "args": {...}}\n\n'
-            "Если инструмент не должен использоваться, верни именно этот формат:\n"
-            '{"use_tool": false, "response": "short reply in Russian"}\n\n'
+            "Если инструмент не нужен, верни именно такой формат:\n"
+            '{"use_tool": false, "response": "короткий ответ на русском"}\n\n'
             f"Доступные инструменты:\n{json.dumps(TOOLS_SCHEMA, ensure_ascii=False)}"
         )
 
-    def _parse_json(self, raw: str) -> dict:
+    def _parse_json(self, raw: str) -> dict[str, Any]:
         raw = raw.strip()
 
-        # Clear JSON
         if raw.startswith("{") and raw.endswith("}"):
             return json.loads(raw)
 
-        # Created JSON
         if "```json" in raw:
             start = raw.find("```json") + len("```json")
             end = raw.rfind("```")
@@ -75,7 +88,6 @@ class ToolSelector:
             json_part = raw[start:end].strip()
             return json.loads(json_part)
 
-        # Fallback
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and start < end:

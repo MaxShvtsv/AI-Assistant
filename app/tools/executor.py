@@ -2,12 +2,12 @@ from tools.registry import TOOLS_REGISTRY
 
 
 class ToolExecutionError(Exception):
-    """Tool resoulution exeption."""
+    """Tool execution exception."""
     pass
 
 
 def execute_tool(tool_name: str, args: dict) -> str:
-    """Returns tool function by name."""
+    """Execute a tool by registry name."""
     if tool_name not in TOOLS_REGISTRY:
         raise ToolExecutionError(f"Unknown tool: {tool_name}")
 
