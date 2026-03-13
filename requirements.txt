@@ -1,6 +1,16 @@
+setuptools>=75,<82
 numpy>=1.26
 ollama>=0.6
 faster-whisper==1.2.1
 scipy>=1.11
 sounddevice==0.5.5
 openwakeword==0.6.0
+
+# Wakeword training
+torch>=2.2
+onnx>=1.16
+onnxscript==0.6.2
+
+# Optional: only needed if you want .tflite export from the trained ONNX model
+onnx-tf==1.10.0
+tensorflow-cpu>=2.16

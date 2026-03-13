@@ -7,3 +7,9 @@ __pycache__
 
 # Temporary data
 data/input
+data/wakeword/raw/intel_positive/*.wav
+data/wakeword/raw/intel_negative/*.wav
+data/wakeword/prepared/*/*.wav
+
+# Training
+data/wakeword/features/intel/*.npy
