@@ -3,3 +3,6 @@
 
 # Python
 __pycache__
+
+# Temporary data
+data/input

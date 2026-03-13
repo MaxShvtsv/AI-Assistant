@@ -16,7 +16,7 @@ dependencies = [
     "ollama>=0.6",
     "faster-whisper==1.2.1",
     "sounddevice==0.5.5",
-    "scipy>=1.1"
+    "openwakeword==0.6.0"
 ]
 
 [project.optional-dependencies]
