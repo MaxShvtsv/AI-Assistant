@@ -1,6 +1,7 @@
 """Main entry point for AI Assistant with wake word support."""
 
 import os
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -16,6 +17,12 @@ COMMAND_AUDIO_PATH = BASE_INPUT_DIR / "command.wav"
 WAKEWORD_PHRASE = os.getenv("INTEL_WAKEWORD_PHRASE", "Intel")
 WAKEWORD_MODEL_KEY = os.getenv("INTEL_WAKEWORD_MODEL_KEY", "assistant")
 WAKEWORD_MODEL_PATH = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
+WAKEWORD_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_THRESHOLD", "0.72"))
+WAKEWORD_MIN_RMS = float(os.getenv("INTEL_WAKEWORD_MIN_RMS", "180"))
+WAKEWORD_MIN_CONSECUTIVE_HITS = int(os.getenv("INTEL_WAKEWORD_MIN_CONSECUTIVE_HITS", "2"))
+WAKEWORD_DEBUG = os.getenv("INTEL_WAKEWORD_DEBUG", "0") == "1"
+WAKEWORD_DEBUG_SCORE_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_DEBUG_SCORE_THRESHOLD", "0.15"))
+REQUIRE_WAKEWORD_IN_TRANSCRIPT = os.getenv("INTEL_REQUIRE_WAKEWORD_IN_TRANSCRIPT", "1") == "1"
 
 
 stt = FasterWhisperSTT(
@@ -65,6 +72,15 @@ def build_wake_handler(assistant: AssistantService) -> Callable[[], None]:
             print("[WakeWord] Empty command detected.")
             return
 
+        if REQUIRE_WAKEWORD_IN_TRANSCRIPT and not transcript_contains_wakeword(user_message):
+            print(f"[WakeWord] Ignored false activation: '{user_message}'")
+            return
+
+        user_message = strip_wakeword_from_transcript(user_message).strip(" ,.!?:;-")
+        if not user_message:
+            print("[WakeWord] Wake word detected, but command is empty.")
+            return
+
         print(f"[You said]: {user_message}")
 
         try:
@@ -74,6 +90,42 @@ def build_wake_handler(assistant: AssistantService) -> Callable[[], None]:
             print(f"[Error] Assistant failed to process command: {exc}")
 
     return handle_wake
+
+
+def normalize_text(value: str) -> str:
+    value = value.lower().replace("ё", "е")
+    value = re.sub(r"[^a-zа-я0-9\s]", " ", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def wakeword_variants() -> list[str]:
+    normalized_phrase = normalize_text(WAKEWORD_PHRASE)
+    variants = {
+        normalized_phrase,
+        "интел",
+        "intel",
+    }
+    return [variant for variant in variants if variant]
+
+
+def transcript_contains_wakeword(transcript: str) -> bool:
+    normalized = normalize_text(transcript)
+    if not normalized:
+        return False
+
+    return any(
+        normalized == variant
+        or normalized.startswith(variant + " ")
+        or f" {variant} " in f" {normalized} "
+        for variant in wakeword_variants()
+    )
+
+
+def strip_wakeword_from_transcript(transcript: str) -> str:
+    cleaned = transcript.strip()
+    pattern = re.compile(r"^\s*(intel|интел)\s*[,.!?:;-]?\s*", flags=re.IGNORECASE)
+    return pattern.sub("", cleaned, count=1)
 
 
 def main() -> None:
@@ -87,7 +139,7 @@ def main() -> None:
 
     detector = OpenWakeWordDetector(
         wakeword_name=WAKEWORD_MODEL_KEY,
-        threshold=0.5,
+        threshold=WAKEWORD_THRESHOLD,
         model_path=WAKEWORD_MODEL_PATH,
         download_models=WAKEWORD_MODEL_PATH is None,
     )
@@ -101,8 +153,12 @@ def main() -> None:
             channels=1,
             dtype="int16",
             blocksize=1280,
-            detection_threshold=0.5,
+            detection_threshold=WAKEWORD_THRESHOLD,
             cooldown_sec=2.5,
+            min_chunk_rms=WAKEWORD_MIN_RMS,
+            min_consecutive_detections=WAKEWORD_MIN_CONSECUTIVE_HITS,
+            debug_log_scores=WAKEWORD_DEBUG,
+            debug_score_threshold=WAKEWORD_DEBUG_SCORE_THRESHOLD,
         ),
     )
 

@@ -18,6 +18,10 @@ class WakeWordConfig:
     blocksize: int = 1280
     detection_threshold: float = 0.5
     cooldown_sec: float = 2.0
+    min_chunk_rms: float = 150.0
+    min_consecutive_detections: int = 3
+    debug_log_scores: bool = False
+    debug_score_threshold: float = 0.15
 
 
 class WakeWordListener:
@@ -37,6 +41,7 @@ class WakeWordListener:
         self._stop_event = threading.Event()
         self._handling_wake = threading.Event()
         self._cooldown_until = 0.0
+        self._consecutive_detections = 0
 
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         if status:
@@ -71,14 +76,35 @@ class WakeWordListener:
                     continue
 
                 audio = np.squeeze(chunk)
+                chunk_rms = self._compute_chunk_rms(audio)
 
-                # Здесь будет вызов твоего wake word detector
+                # Ignore silence / very quiet noise before even asking the detector.
+                if chunk_rms < self.config.min_chunk_rms:
+                    self._consecutive_detections = 0
+                    continue
+
                 score = self._predict_score(audio)
 
+                if self.config.debug_log_scores and score >= self.config.debug_score_threshold:
+                    print(
+                        f"[wakeword-debug] score={score:.3f} "
+                        f"rms={chunk_rms:.1f} hits={self._consecutive_detections}"
+                    )
+
                 if score >= self.config.detection_threshold:
-                    print(f"[wakeword] detected '{self.wakeword_name}' with score={score:.3f}")
+                    self._consecutive_detections += 1
+                else:
+                    self._consecutive_detections = 0
+                    continue
+
+                if self._consecutive_detections >= self.config.min_consecutive_detections:
+                    print(
+                        f"[wakeword] detected '{self.wakeword_name}' "
+                        f"with score={score:.3f} rms={chunk_rms:.1f}"
+                    )
                     self._cooldown_until = time.time() + self.config.cooldown_sec
                     self._handling_wake.set()
+                    self._consecutive_detections = 0
                     self._clear_audio_queue()
 
                     try:
@@ -107,3 +133,10 @@ class WakeWordListener:
                 self._audio_queue.get_nowait()
             except queue.Empty:
                 return
+
+    @staticmethod
+    def _compute_chunk_rms(audio: np.ndarray) -> float:
+        samples = np.asarray(audio, dtype=np.float32)
+        if samples.size == 0:
+            return 0.0
+        return float(np.sqrt(np.mean(np.square(samples))))
