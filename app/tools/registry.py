@@ -1,4 +1,4 @@
-from tools.applications import open_app, open_url
+from tools.applications import list_available_apps, open_app, open_url
 from tools.file_system import (
     append_text_file,
     copy_path,
@@ -21,4 +21,5 @@ TOOLS_REGISTRY = {
     "move_path": move_path,
     "open_url": open_url,
     "open_app": open_app,
+    "list_available_apps": list_available_apps,
 }

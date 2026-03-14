@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from llm.ollama_client import OllamaClient
+from tools.applications import get_catalog_prompt
 from tools.registry import TOOLS_REGISTRY
 from tools.schema import TOOLS_SCHEMA
 
@@ -56,6 +57,7 @@ class ToolSelector:
         )
 
     def _build_system_prompt(self) -> str:
+        app_catalog_prompt = get_catalog_prompt(limit=80)
         return (
             "Ты локальный помощник под названием Intel.\n"
             "Твоя задача - решить, нужно ли использовать один из доступных инструментов.\n\n"
@@ -63,10 +65,13 @@ class ToolSelector:
             "Не используй markdown.\n"
             "Не добавляй пояснения.\n"
             "Не добавляй текст до или после JSON.\n\n"
+            "Для tool open_app сначала выбери ровно одно приложение из списка доступных приложений.\n"
+            "Не придумывай app_name, которого нет в списке.\n\n"
             "Если нужен инструмент, верни именно такой формат:\n"
             '{"use_tool": true, "tool": "tool_name", "args": {...}}\n\n'
             "Если инструмент не нужен, верни именно такой формат:\n"
             '{"use_tool": false, "response": "короткий ответ на русском"}\n\n'
+            f"Доступные приложения для open_app:\n{app_catalog_prompt}\n\n"
             f"Доступные инструменты:\n{json.dumps(TOOLS_SCHEMA, ensure_ascii=False)}"
         )
 

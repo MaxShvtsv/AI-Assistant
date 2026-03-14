@@ -155,13 +155,13 @@ TOOLS_SCHEMA = [
     },
     {
         "name": "open_app",
-        "description": "Open a supported desktop application such as browser, vscode, telegram, notepad, powershell, cmd, or explorer.",
+        "description": "Open one desktop application chosen from the installed Windows app catalog. The assistant should match exactly one app from the available app list before calling this tool.",
         "parameters": {
             "type": "object",
             "properties": {
                 "app_name": {
                     "type": "string",
-                    "description": "App identifier like browser, chrome, edge, firefox, vscode, telegram, notepad, powershell, cmd, explorer",
+                    "description": "Exact application name from the available app catalog or a known alias",
                 },
                 "target": {
                     "type": "string",
@@ -169,6 +169,20 @@ TOOLS_SCHEMA = [
                 },
             },
             "required": ["app_name"],
+        },
+    },
+    {
+        "name": "list_available_apps",
+        "description": "List discovered launchable desktop applications from the Windows app catalog.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Optional maximum number of app names to return",
+                }
+            },
+            "required": [],
         },
     },
 ]
