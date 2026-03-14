@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import time
 import urllib.parse
 from functools import lru_cache
@@ -300,7 +301,25 @@ def _run_powershell(script: str) -> None:
         capture_output=True,
         text=True,
         check=False,
+        creationflags=_creationflags_no_window(),
+        startupinfo=_startupinfo_no_window(),
     )
     if completed.returncode != 0:
         stderr = completed.stderr.strip() or completed.stdout.strip()
         raise RuntimeError(stderr or f"PowerShell command failed with code {completed.returncode}")
+
+
+def _creationflags_no_window() -> int:
+    if sys.platform != "win32":
+        return 0
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _startupinfo_no_window():
+    if sys.platform != "win32":
+        return None
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = 0
+    return startupinfo

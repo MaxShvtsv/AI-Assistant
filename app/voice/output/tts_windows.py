@@ -4,6 +4,7 @@ import base64
 import json
 import re
 import subprocess
+import sys
 from typing import Optional
 
 
@@ -49,6 +50,8 @@ def speak_text(
         capture_output=True,
         text=True,
         check=False,
+        creationflags=_creationflags_no_window(),
+        startupinfo=_startupinfo_no_window(),
     )
     if completed.returncode != 0:
         stderr = completed.stderr.strip() or completed.stdout.strip()
@@ -268,3 +271,19 @@ def _voice_for_chunk(
 
 def _encode_powershell_script(script: str) -> str:
     return base64.b64encode(script.encode("utf-16le")).decode("ascii")
+
+
+def _creationflags_no_window() -> int:
+    if sys.platform != "win32":
+        return 0
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _startupinfo_no_window():
+    if sys.platform != "win32":
+        return None
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = 0
+    return startupinfo

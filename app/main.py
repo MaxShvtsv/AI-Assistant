@@ -102,19 +102,33 @@ TTS_EN_VOICE_NAME = os.getenv("INTEL_TTS_EN_VOICE_NAME", "David")
 TTS_RATE = int(os.getenv("INTEL_TTS_RATE", "2"))
 TTS_VOLUME = int(os.getenv("INTEL_TTS_VOLUME", "100"))
 TTS_MAX_CHARS = int(os.getenv("INTEL_TTS_MAX_CHARS", "280"))
+PLAY_STARTUP_CUE = os.getenv("INTEL_PLAY_STARTUP_CUE", "1") == "1"
+
+_stt: Optional[FasterWhisperSTT] = None
+_stt_lock = threading.Lock()
 
 
-stt = FasterWhisperSTT(
-    model_size=STT_MODEL_SIZE,
-    model_path=STT_MODEL_PATH,
-    device=STT_DEVICE,
-    compute_type=STT_COMPUTE_TYPE,
-    language="ru",
-    beam_size=STT_BEAM_SIZE,
-    best_of=STT_BEST_OF,
-    temperature=STT_TEMPERATURE,
-    vad_min_silence_duration_ms=STT_VAD_MIN_SILENCE_MS,
-)
+def get_stt() -> FasterWhisperSTT:
+    global _stt
+
+    if _stt is not None:
+        return _stt
+
+    with _stt_lock:
+        if _stt is None:
+            _stt = FasterWhisperSTT(
+                model_size=STT_MODEL_SIZE,
+                model_path=STT_MODEL_PATH,
+                device=STT_DEVICE,
+                compute_type=STT_COMPUTE_TYPE,
+                language="ru",
+                beam_size=STT_BEAM_SIZE,
+                best_of=STT_BEST_OF,
+                temperature=STT_TEMPERATURE,
+                vad_min_silence_duration_ms=STT_VAD_MIN_SILENCE_MS,
+            )
+
+    return _stt
 
 
 def recognize_speech_from_command_audio(initial_audio: Optional[np.ndarray] = None) -> str:
@@ -141,7 +155,7 @@ def recognize_speech_from_command_audio(initial_audio: Optional[np.ndarray] = No
     )
     play_audio_cue(str(COMMAND_END_CUE_PATH), wait=False)
 
-    return stt.transcribe_file(wav_path).strip()
+    return get_stt().transcribe_file(wav_path).strip()
 
 
 def build_wake_handler(assistant: AssistantService) -> Callable[[Optional[np.ndarray]], None]:
@@ -281,6 +295,8 @@ def create_listener(assistant: Optional[AssistantService] = None) -> WakeWordLis
 
 def main() -> None:
     print("Intel is ready.")
+    if PLAY_STARTUP_CUE:
+        play_audio_cue(str(COMMAND_START_CUE_PATH), wait=False)
 
     listener = create_listener()
 
