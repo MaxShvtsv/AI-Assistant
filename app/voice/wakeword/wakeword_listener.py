@@ -105,13 +105,16 @@ class WakeWordListener:
                     self._cooldown_until = time.time() + self.config.cooldown_sec
                     self._handling_wake.set()
                     self._consecutive_detections = 0
+                    self._reset_detector()
                     self._clear_audio_queue()
 
                     try:
                         self.on_wake()
                     finally:
+                        self._reset_detector()
                         self._clear_audio_queue()
                         self._handling_wake.clear()
+                        print("[wakeword] resumed listening")
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -133,6 +136,11 @@ class WakeWordListener:
                 self._audio_queue.get_nowait()
             except queue.Empty:
                 return
+
+    def _reset_detector(self) -> None:
+        reset_method = getattr(self.detector, "reset", None)
+        if callable(reset_method):
+            reset_method()
 
     @staticmethod
     def _compute_chunk_rms(audio: np.ndarray) -> float:

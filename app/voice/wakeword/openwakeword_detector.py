@@ -119,6 +119,12 @@ class OpenWakeWordDetector:
         """
         return self.predict(audio) >= self.threshold
 
+    def reset(self) -> None:
+        """Reset internal openWakeWord buffers after a detection cycle."""
+        reset_method = getattr(self.model, "reset", None)
+        if callable(reset_method):
+            reset_method()
+
     @staticmethod
     def _prepare_audio(audio: np.ndarray) -> np.ndarray:
         """
