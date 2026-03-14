@@ -77,3 +77,23 @@ def test_tool_selector_uses_fast_path_for_known_apps() -> None:
     assert decision.tool == "open_app"
     assert decision.args == {"app_name": "Telegram"}
     assert llm.calls == 0
+
+
+def test_tool_selector_prefers_conversation_for_explanations() -> None:
+    llm = FakeLLM('{"use_tool": true, "tool": "open_app", "args": {"app_name": "Telegram"}}')
+    selector = ToolSelector(llm)
+
+    decision = selector.decide("Расскажи, как работает твой выбор инструментов")
+
+    assert decision.use_tool is False
+    assert llm.calls == 0
+
+
+def test_tool_selector_prefers_conversation_for_plain_questions() -> None:
+    llm = FakeLLM('{"use_tool": true, "tool": "list_dir", "args": {"path": "D:\\\\"}}')
+    selector = ToolSelector(llm)
+
+    decision = selector.decide("Какие эмоции ты сейчас чувствуешь?")
+
+    assert decision.use_tool is False
+    assert llm.calls == 0

@@ -118,8 +118,13 @@ def split_text_by_language(
             current_voice = voice_hint
             continue
 
-        if voice_hint == current_voice:
+        if not voice_hint:
             current_text += chunk
+            continue
+
+        if not current_voice or voice_hint == current_voice:
+            current_text += chunk
+            current_voice = voice_hint or current_voice
             continue
 
         if current_text.strip():

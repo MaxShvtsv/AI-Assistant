@@ -19,6 +19,7 @@ def record_command_until_silence(
     start_timeout_sec: float = 4.0,
     silence_duration_sec: float = 1.0,
     max_duration_sec: float = 10.0,
+    initial_audio: np.ndarray | None = None,
 ) -> str:
     audio_queue: queue.Queue[np.ndarray] = queue.Queue()
     frames: list[np.ndarray] = []
@@ -32,7 +33,19 @@ def record_command_until_silence(
     speech_started_at = None
     started_at = time.time()
 
-    print("[record] waiting for command...")
+    if initial_audio is not None:
+        prepared_initial_audio = np.asarray(initial_audio, dtype=np.int16).reshape(-1, 1)
+        if prepared_initial_audio.size > 0:
+            initial_amplitude = int(np.abs(prepared_initial_audio).mean())
+            frames.append(prepared_initial_audio)
+            if initial_amplitude >= speech_threshold:
+                speech_started_at = time.time()
+                print("[record] continuing command from wake word audio...")
+
+    if speech_started_at is None:
+        print("[record] waiting for command...")
+    else:
+        print("[record] speech detected, recording command...")
 
     with sd.InputStream(
         samplerate=sample_rate,

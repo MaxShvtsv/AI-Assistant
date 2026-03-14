@@ -1,19 +1,22 @@
 """Main entry point for AI Assistant with wake word support."""
 
+from __future__ import annotations
+
 import os
 import re
 import threading
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
+import numpy as np
 from dotenv import load_dotenv
 
 from core.assistant_service import AssistantService
 from voice.input.audio_recorder import record_command_until_silence
+from voice.input.stt_faster_whisper import FasterWhisperSTT
 from voice.output.tts_windows import speak_text
 from voice.sound_cues import play_audio_cue
-from voice.input.stt_faster_whisper import FasterWhisperSTT
 from voice.wakeword.openwakeword_detector import OpenWakeWordDetector
 from voice.wakeword.wakeword_listener import WakeWordConfig, WakeWordListener
 
@@ -23,6 +26,7 @@ load_dotenv()
 BASE_INPUT_DIR = Path(r"D:\Desktop\Development\AI-Assistant\data\input")
 DEFAULT_START_CUE_PATH = r"D:\Desktop\Development\AI-Assistant\data\sounds\inter_start.wav"
 DEFAULT_END_CUE_PATH = r"D:\Desktop\Development\AI-Assistant\data\sounds\inter_end.wav"
+
 WAKEWORD_PHRASE = os.getenv("INTEL_WAKEWORD_PHRASE", "Intel")
 WAKEWORD_MODEL_KEY = os.getenv("INTEL_WAKEWORD_MODEL_KEY", "assistant")
 WAKEWORD_MODEL_PATH = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
@@ -31,12 +35,18 @@ WAKEWORD_MIN_RMS = float(os.getenv("INTEL_WAKEWORD_MIN_RMS", "220"))
 WAKEWORD_MIN_CONSECUTIVE_HITS = int(os.getenv("INTEL_WAKEWORD_MIN_CONSECUTIVE_HITS", "2"))
 WAKEWORD_COOLDOWN_SEC = float(os.getenv("INTEL_WAKEWORD_COOLDOWN_SEC", "3.0"))
 WAKEWORD_IDLE_RESET_SEC = float(os.getenv("INTEL_WAKEWORD_IDLE_RESET_SEC", "4.0"))
+WAKEWORD_INSTANT_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_INSTANT_THRESHOLD", "0.72"))
+WAKEWORD_WINDOW_FRAMES = int(os.getenv("INTEL_WAKEWORD_WINDOW_FRAMES", "4"))
+WAKEWORD_WINDOW_RATIO = float(os.getenv("INTEL_WAKEWORD_WINDOW_RATIO", "0.82"))
+WAKEWORD_PRE_ROLL_CHUNKS = int(os.getenv("INTEL_WAKEWORD_PRE_ROLL_CHUNKS", "8"))
 WAKEWORD_DEBUG = os.getenv("INTEL_WAKEWORD_DEBUG", "0") == "1"
 WAKEWORD_DEBUG_SCORE_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_DEBUG_SCORE_THRESHOLD", "0.15"))
+
 REQUIRE_WAKEWORD_IN_TRANSCRIPT = os.getenv("INTEL_REQUIRE_WAKEWORD_IN_TRANSCRIPT", "0") == "1"
 COMMAND_START_TIMEOUT_SEC = float(os.getenv("INTEL_COMMAND_START_TIMEOUT_SEC", "7.0"))
 COMMAND_MAX_DURATION_SEC = float(os.getenv("INTEL_COMMAND_MAX_DURATION_SEC", "12.0"))
 COMMAND_SILENCE_DURATION_SEC = float(os.getenv("INTEL_COMMAND_SILENCE_DURATION_SEC", "1.3"))
+
 STT_MODEL_SIZE = os.getenv("INTEL_STT_MODEL_SIZE", "small")
 STT_DEVICE = os.getenv("INTEL_STT_DEVICE", "cpu")
 STT_COMPUTE_TYPE = os.getenv("INTEL_STT_COMPUTE_TYPE", "int8")
@@ -44,8 +54,10 @@ STT_BEAM_SIZE = int(os.getenv("INTEL_STT_BEAM_SIZE", "5"))
 STT_BEST_OF = int(os.getenv("INTEL_STT_BEST_OF", "3"))
 STT_TEMPERATURE = float(os.getenv("INTEL_STT_TEMPERATURE", "0.0"))
 STT_VAD_MIN_SILENCE_MS = int(os.getenv("INTEL_STT_VAD_MIN_SILENCE_MS", "500"))
+
 COMMAND_START_CUE_PATH = os.getenv("INTEL_COMMAND_START_CUE_PATH", DEFAULT_START_CUE_PATH)
 COMMAND_END_CUE_PATH = os.getenv("INTEL_COMMAND_END_CUE_PATH", DEFAULT_END_CUE_PATH)
+
 TTS_ENABLED = os.getenv("INTEL_TTS_ENABLED", "1") == "1"
 TTS_VOICE_NAME = os.getenv("INTEL_TTS_VOICE_NAME")
 TTS_RU_VOICE_NAME = os.getenv("INTEL_TTS_RU_VOICE_NAME", "Seva")
@@ -67,12 +79,16 @@ stt = FasterWhisperSTT(
 )
 
 
-def recognize_speech_from_command_audio() -> str:
+def recognize_speech_from_command_audio(initial_audio: Optional[np.ndarray] = None) -> str:
     """Record a voice command after wake word activation and transcribe it."""
     BASE_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     command_audio_path = BASE_INPUT_DIR / f"command_{int(time.time() * 1000)}.wav"
 
-    play_audio_cue(COMMAND_START_CUE_PATH, wait=True)
+    initial_rms = _compute_audio_rms(initial_audio)
+    should_play_start_cue = initial_rms < 500
+    if should_play_start_cue:
+        play_audio_cue(COMMAND_START_CUE_PATH, wait=True)
+
     wav_path = record_command_until_silence(
         output_path=str(command_audio_path),
         sample_rate=16000,
@@ -83,17 +99,18 @@ def recognize_speech_from_command_audio() -> str:
         start_timeout_sec=COMMAND_START_TIMEOUT_SEC,
         silence_duration_sec=COMMAND_SILENCE_DURATION_SEC,
         max_duration_sec=COMMAND_MAX_DURATION_SEC,
+        initial_audio=initial_audio,
     )
     play_audio_cue(COMMAND_END_CUE_PATH, wait=False)
 
     return stt.transcribe_file(wav_path).strip()
 
 
-def build_wake_handler(assistant: AssistantService) -> Callable[[], None]:
+def build_wake_handler(assistant: AssistantService) -> Callable[[Optional[np.ndarray]], None]:
     """Create a callback that runs when wake word is detected."""
     activation_lock = threading.Lock()
 
-    def handle_wake() -> None:
+    def handle_wake(initial_audio: Optional[np.ndarray] = None) -> None:
         if not activation_lock.acquire(blocking=False):
             print("[WakeWord] Activation ignored because another command is already being processed.")
             return
@@ -101,7 +118,7 @@ def build_wake_handler(assistant: AssistantService) -> Callable[[], None]:
         print("[WakeWord] Activated. Listening for command...")
 
         try:
-            user_message = recognize_speech_from_command_audio()
+            user_message = recognize_speech_from_command_audio(initial_audio=initial_audio)
         except Exception as exc:
             print(f"[Error] Failed to record/transcribe command: {exc}")
             activation_lock.release()
@@ -182,6 +199,15 @@ def strip_wakeword_from_transcript(transcript: str) -> str:
     return pattern.sub("", cleaned, count=1)
 
 
+def _compute_audio_rms(audio: Optional[np.ndarray]) -> float:
+    if audio is None:
+        return 0.0
+    samples = np.asarray(audio, dtype=np.float32).reshape(-1)
+    if samples.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(np.square(samples))))
+
+
 def main() -> None:
     assistant = AssistantService()
 
@@ -210,6 +236,10 @@ def main() -> None:
             debug_log_scores=WAKEWORD_DEBUG,
             debug_score_threshold=WAKEWORD_DEBUG_SCORE_THRESHOLD,
             detector_idle_reset_sec=WAKEWORD_IDLE_RESET_SEC,
+            instant_detection_threshold=WAKEWORD_INSTANT_THRESHOLD,
+            activation_window_frames=WAKEWORD_WINDOW_FRAMES,
+            activation_window_ratio=WAKEWORD_WINDOW_RATIO,
+            pre_roll_chunks=WAKEWORD_PRE_ROLL_CHUNKS,
         ),
     )
 

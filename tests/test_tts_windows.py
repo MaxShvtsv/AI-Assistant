@@ -28,6 +28,18 @@ def test_split_text_into_chunks_preserves_full_text() -> None:
     assert " ".join(chunks) == text
 
 
+def test_split_text_by_language_keeps_spaces_inside_segments() -> None:
+    result = tts.split_text_by_language(
+        "Открываю GitHub и папку Downloads",
+        ru_voice_name="Seva",
+        en_voice_name="David",
+    )
+
+    assert any(segment["text"] == "Открываю" and segment["voice"] == "Seva" for segment in result)
+    assert any(segment["text"] == "GitHub" and segment["voice"] == "David" for segment in result)
+    assert any("и папку" in segment["text"] for segment in result)
+
+
 def test_split_text_by_language_uses_different_voice_hints() -> None:
     result = tts.split_text_by_language(
         "Открываю GitHub и папку Downloads",

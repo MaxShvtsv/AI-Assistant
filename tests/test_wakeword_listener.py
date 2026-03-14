@@ -47,6 +47,8 @@ def test_listener_supports_configured_detection_guards() -> None:
             min_consecutive_detections=4,
             debug_log_scores=True,
             debug_score_threshold=0.2,
+            activation_window_frames=5,
+            activation_window_ratio=0.85,
         ),
     )
 
@@ -54,3 +56,5 @@ def test_listener_supports_configured_detection_guards() -> None:
     assert listener.config.min_consecutive_detections == 4
     assert listener.config.debug_log_scores is True
     assert listener.config.debug_score_threshold == 0.2
+    assert listener.config.activation_window_frames == 5
+    assert listener.config.activation_window_ratio == 0.85

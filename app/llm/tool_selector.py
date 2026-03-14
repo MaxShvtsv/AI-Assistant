@@ -20,6 +20,81 @@ class ToolDecision:
     raw_output: Optional[str] = None
 
 
+TOOL_ACTION_HINTS = (
+    "открой",
+    "запусти",
+    "переключи",
+    "перейди",
+    "покажи файлы",
+    "покажи содержимое",
+    "список файлов",
+    "создай",
+    "создать",
+    "удали",
+    "скопируй",
+    "перемести",
+    "переименуй",
+    "прочитай файл",
+    "запиши",
+    "допиши",
+    "открой в проводнике",
+    "открой приложение",
+    "открой сайт",
+    "открой вкладку",
+    "найди в браузере",
+    "youtube music",
+    "ютуб мьюзик",
+)
+
+CONVERSATION_HINTS = (
+    "что такое",
+    "кто такой",
+    "кто такая",
+    "кто ты",
+    "что ты",
+    "расскажи",
+    "объясни",
+    "почему",
+    "зачем",
+    "как работает",
+    "как устроен",
+    "как устроена",
+    "как устроено",
+    "что думаешь",
+    "как ты думаешь",
+    "какие эмоции",
+    "что чувствуешь",
+    "что ты чувствуешь",
+    "умеешь",
+    "можешь рассказать",
+    "в чем разница",
+    "чем отличается",
+    "сколько",
+)
+
+TOOL_OBJECT_HINTS = (
+    "файл",
+    "папк",
+    "директори",
+    "директория",
+    "диск",
+    "проводник",
+    "браузер",
+    "вкладк",
+    "сайт",
+    "приложени",
+    "telegram",
+    "телеграм",
+    "steam",
+    "chrome",
+    "хром",
+    "vscode",
+    "код",
+    "youtube music",
+    "ютуб",
+)
+
+
 class ToolSelector:
     def __init__(self, llm: OllamaClient) -> None:
         self.llm = llm
@@ -29,6 +104,10 @@ class ToolSelector:
         fast_path_decision = self._try_fast_path(user_input)
         if fast_path_decision is not None:
             return fast_path_decision
+
+        conversational_decision = self._try_conversation_fast_path(user_input)
+        if conversational_decision is not None:
+            return conversational_decision
 
         raw = self.llm.chat(user_message=user_input, system_prompt=self._cached_system_prompt)
 
@@ -66,18 +145,28 @@ class ToolSelector:
     def _build_system_prompt(self) -> str:
         app_catalog_prompt = get_catalog_prompt(limit=80)
         return (
-            "Ты локальный помощник под названием Intel.\n"
-            "Твоя задача - решить, нужно ли использовать один из доступных инструментов.\n\n"
+            "Ты локальный помощник по имени Intel.\n"
+            "Твоя задача — решить, нужен ли ровно один инструмент для ответа.\n\n"
+            "Используй инструмент только если пользователь просит выполнить действие во внешнем мире:\n"
+            "- открыть или переключить приложение, сайт, вкладку или проводник\n"
+            "- показать содержимое папки или прочитать файл\n"
+            "- создать, записать, скопировать, переместить или изменить файл/папку\n"
+            "- управлять YouTube Music\n\n"
+            "Не используй инструмент, если пользователь:\n"
+            "- просит что-то объяснить, рассказать, сравнить или обсудить\n"
+            "- задает обычный вопрос\n"
+            "- хочет просто пообщаться\n"
+            "- спрашивает о твоих возможностях, логике работы или мнении\n\n"
             "Возвращай только валидный JSON.\n"
             "Не используй markdown.\n"
             "Не добавляй пояснения.\n"
             "Не добавляй текст до или после JSON.\n\n"
-            "Для tool open_app сначала выбери ровно одно приложение из списка доступных приложений.\n"
-            "Не придумывай app_name, которого нет в списке.\n\n"
             "Если нужен инструмент, верни именно такой формат:\n"
             '{"use_tool": true, "tool": "tool_name", "args": {...}}\n\n'
             "Если инструмент не нужен, верни именно такой формат:\n"
             '{"use_tool": false, "response": "короткий ответ на русском"}\n\n'
+            "Для tool open_app сначала выбери ровно одно приложение из списка доступных приложений.\n"
+            "Не придумывай app_name, которого нет в списке.\n\n"
             f"Доступные приложения для open_app:\n{app_catalog_prompt}\n\n"
             f"Доступные инструменты:\n{json.dumps(TOOLS_SCHEMA, ensure_ascii=False)}"
         )
@@ -136,6 +225,19 @@ class ToolSelector:
 
         return None
 
+    def _try_conversation_fast_path(self, user_input: str) -> Optional[ToolDecision]:
+        normalized = _normalize_text(user_input)
+        if not normalized:
+            return None
+
+        if any(hint in normalized for hint in CONVERSATION_HINTS):
+            return ToolDecision(use_tool=False)
+
+        if "?" in user_input and not _looks_like_tool_request(normalized):
+            return ToolDecision(use_tool=False)
+
+        return None
+
     def _parse_json(self, raw: str) -> dict[str, Any]:
         raw = raw.strip()
 
@@ -157,7 +259,7 @@ class ToolSelector:
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and start < end:
-            return json.loads(raw[start:end + 1])
+            return json.loads(raw[start : end + 1])
 
         raise ValueError("No valid JSON found in LLM response")
 
@@ -171,6 +273,12 @@ def _normalize_text(value: str) -> str:
 
 def _contains_any(text: str, variants: tuple[str, ...]) -> bool:
     return any(variant in text for variant in variants)
+
+
+def _looks_like_tool_request(normalized: str) -> bool:
+    return any(hint in normalized for hint in TOOL_ACTION_HINTS) or any(
+        hint in normalized for hint in TOOL_OBJECT_HINTS
+    )
 
 
 def _match_known_app(normalized: str) -> Optional[str]:
