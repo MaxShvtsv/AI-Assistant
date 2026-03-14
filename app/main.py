@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import threading
 import time
 from pathlib import Path
@@ -21,15 +22,39 @@ from voice.wakeword.openwakeword_detector import OpenWakeWordDetector
 from voice.wakeword.wakeword_listener import WakeWordConfig, WakeWordListener
 
 
-load_dotenv()
+def get_runtime_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[1]
 
-BASE_INPUT_DIR = Path(r"D:\Desktop\Development\AI-Assistant\data\input")
-DEFAULT_START_CUE_PATH = r"D:\Desktop\Development\AI-Assistant\data\sounds\inter_start.wav"
-DEFAULT_END_CUE_PATH = r"D:\Desktop\Development\AI-Assistant\data\sounds\inter_end.wav"
+
+RUNTIME_ROOT = get_runtime_root()
+load_dotenv(RUNTIME_ROOT / ".env")
+
+
+def _resolve_runtime_path(raw_path: Optional[str], default: Path) -> Path:
+    if not raw_path:
+        return default
+
+    candidate = Path(raw_path.strip().strip('"'))
+    if candidate.is_absolute():
+        return candidate
+    return (RUNTIME_ROOT / candidate).resolve()
+
+
+BASE_INPUT_DIR = RUNTIME_ROOT / "data" / "input"
+DEFAULT_START_CUE_PATH = RUNTIME_ROOT / "data" / "sounds" / "intel_start.wav"
+DEFAULT_END_CUE_PATH = RUNTIME_ROOT / "data" / "sounds" / "intel_end.wav"
+DEFAULT_WAKEWORD_MODEL_PATH = RUNTIME_ROOT / "data" / "wakeword" / "models" / "intel.onnx"
 
 WAKEWORD_PHRASE = os.getenv("INTEL_WAKEWORD_PHRASE", "Intel")
 WAKEWORD_MODEL_KEY = os.getenv("INTEL_WAKEWORD_MODEL_KEY", "assistant")
-WAKEWORD_MODEL_PATH = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
+WAKEWORD_MODEL_PATH_RAW = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
+WAKEWORD_MODEL_PATH = (
+    str(_resolve_runtime_path(WAKEWORD_MODEL_PATH_RAW, DEFAULT_WAKEWORD_MODEL_PATH))
+    if WAKEWORD_MODEL_PATH_RAW
+    else None
+)
 WAKEWORD_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_THRESHOLD", "0.58"))
 WAKEWORD_MIN_RMS = float(os.getenv("INTEL_WAKEWORD_MIN_RMS", "220"))
 WAKEWORD_MIN_CONSECUTIVE_HITS = int(os.getenv("INTEL_WAKEWORD_MIN_CONSECUTIVE_HITS", "2"))
@@ -48,6 +73,12 @@ COMMAND_MAX_DURATION_SEC = float(os.getenv("INTEL_COMMAND_MAX_DURATION_SEC", "12
 COMMAND_SILENCE_DURATION_SEC = float(os.getenv("INTEL_COMMAND_SILENCE_DURATION_SEC", "1.3"))
 
 STT_MODEL_SIZE = os.getenv("INTEL_STT_MODEL_SIZE", "small")
+STT_MODEL_PATH_RAW = os.getenv("INTEL_STT_MODEL_PATH")
+STT_MODEL_PATH = (
+    str(_resolve_runtime_path(STT_MODEL_PATH_RAW, RUNTIME_ROOT / "models" / "faster-whisper"))
+    if STT_MODEL_PATH_RAW
+    else None
+)
 STT_DEVICE = os.getenv("INTEL_STT_DEVICE", "cpu")
 STT_COMPUTE_TYPE = os.getenv("INTEL_STT_COMPUTE_TYPE", "int8")
 STT_BEAM_SIZE = int(os.getenv("INTEL_STT_BEAM_SIZE", "5"))
@@ -55,8 +86,14 @@ STT_BEST_OF = int(os.getenv("INTEL_STT_BEST_OF", "3"))
 STT_TEMPERATURE = float(os.getenv("INTEL_STT_TEMPERATURE", "0.0"))
 STT_VAD_MIN_SILENCE_MS = int(os.getenv("INTEL_STT_VAD_MIN_SILENCE_MS", "500"))
 
-COMMAND_START_CUE_PATH = os.getenv("INTEL_COMMAND_START_CUE_PATH", DEFAULT_START_CUE_PATH)
-COMMAND_END_CUE_PATH = os.getenv("INTEL_COMMAND_END_CUE_PATH", DEFAULT_END_CUE_PATH)
+COMMAND_START_CUE_PATH = _resolve_runtime_path(
+    os.getenv("INTEL_COMMAND_START_CUE_PATH"),
+    DEFAULT_START_CUE_PATH,
+)
+COMMAND_END_CUE_PATH = _resolve_runtime_path(
+    os.getenv("INTEL_COMMAND_END_CUE_PATH"),
+    DEFAULT_END_CUE_PATH,
+)
 
 TTS_ENABLED = os.getenv("INTEL_TTS_ENABLED", "1") == "1"
 TTS_VOICE_NAME = os.getenv("INTEL_TTS_VOICE_NAME")
@@ -69,6 +106,7 @@ TTS_MAX_CHARS = int(os.getenv("INTEL_TTS_MAX_CHARS", "280"))
 
 stt = FasterWhisperSTT(
     model_size=STT_MODEL_SIZE,
+    model_path=STT_MODEL_PATH,
     device=STT_DEVICE,
     compute_type=STT_COMPUTE_TYPE,
     language="ru",
@@ -87,7 +125,7 @@ def recognize_speech_from_command_audio(initial_audio: Optional[np.ndarray] = No
     initial_rms = _compute_audio_rms(initial_audio)
     should_play_start_cue = initial_rms < 500
     if should_play_start_cue:
-        play_audio_cue(COMMAND_START_CUE_PATH, wait=True)
+        play_audio_cue(str(COMMAND_START_CUE_PATH), wait=True)
 
     wav_path = record_command_until_silence(
         output_path=str(command_audio_path),
@@ -101,7 +139,7 @@ def recognize_speech_from_command_audio(initial_audio: Optional[np.ndarray] = No
         max_duration_sec=COMMAND_MAX_DURATION_SEC,
         initial_audio=initial_audio,
     )
-    play_audio_cue(COMMAND_END_CUE_PATH, wait=False)
+    play_audio_cue(str(COMMAND_END_CUE_PATH), wait=False)
 
     return stt.transcribe_file(wav_path).strip()
 

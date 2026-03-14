@@ -1,10 +1,26 @@
 from __future__ import annotations
 
+import importlib
+import sys
+import types
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import openwakeword
+
+# openwakeword imports its training helper at package import time, which in turn
+# pulls in heavy sklearn/torch dependencies that Intel does not need for runtime
+# inference. We provide a tiny stub so the package can initialize without the
+# training stack in portable builds.
+if "openwakeword.custom_verifier_model" not in sys.modules:
+    custom_verifier_stub = types.ModuleType("openwakeword.custom_verifier_model")
+
+    def _train_custom_verifier(*args, **kwargs):  # pragma: no cover - runtime guard
+        raise RuntimeError("Custom verifier training is not available in the Intel runtime build.")
+
+    custom_verifier_stub.train_custom_verifier = _train_custom_verifier
+    sys.modules["openwakeword.custom_verifier_model"] = custom_verifier_stub
+
 from openwakeword.model import Model
 
 
@@ -39,7 +55,8 @@ class OpenWakeWordDetector:
         # downloading them once is the easiest path.
         if download_models and model_path is None:
             try:
-                openwakeword.utils.download_models()
+                openwakeword_utils = importlib.import_module("openwakeword.utils")
+                openwakeword_utils.download_models()
             except Exception as exc:
                 # Don't crash here immediately; model init below may still succeed
                 # if models are already present.

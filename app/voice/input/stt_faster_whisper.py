@@ -31,6 +31,7 @@ class FasterWhisperSTT:
     def __init__(
         self,
         model_size: str = "small",
+        model_path: Optional[str] = None,
         device: str = "cpu",
         compute_type: str = "int8",
         language: Optional[str] = "ru",
@@ -48,11 +49,12 @@ class FasterWhisperSTT:
         self.vad_filter = vad_filter
         self.vad_min_silence_duration_ms = vad_min_silence_duration_ms
         self.initial_prompt = initial_prompt
+        model_reference = model_path or model_size
         self.model = WhisperModel(
-            model_size,
+            model_reference,
             device=device,
             compute_type=compute_type,
-            local_files_only=False,
+            local_files_only=bool(model_path),
         )
 
     def transcribe_file(self, audio_path: str) -> str:

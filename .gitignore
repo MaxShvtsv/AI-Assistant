@@ -4,6 +4,9 @@
 
 # Python
 __pycache__
+build/
+dist/
+*.spec.bak
 
 # Temporary data
 data/input
