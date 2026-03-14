@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from core.assistant_service import AssistantService
 from voice.input.audio_recorder import record_command_until_silence
+from voice.output.tts_windows import speak_text
 from voice.sound_cues import play_audio_cue
 from voice.input.stt_faster_whisper import FasterWhisperSTT
 from voice.wakeword.openwakeword_detector import OpenWakeWordDetector
@@ -45,6 +46,13 @@ STT_TEMPERATURE = float(os.getenv("INTEL_STT_TEMPERATURE", "0.0"))
 STT_VAD_MIN_SILENCE_MS = int(os.getenv("INTEL_STT_VAD_MIN_SILENCE_MS", "500"))
 COMMAND_START_CUE_PATH = os.getenv("INTEL_COMMAND_START_CUE_PATH", DEFAULT_START_CUE_PATH)
 COMMAND_END_CUE_PATH = os.getenv("INTEL_COMMAND_END_CUE_PATH", DEFAULT_END_CUE_PATH)
+TTS_ENABLED = os.getenv("INTEL_TTS_ENABLED", "1") == "1"
+TTS_VOICE_NAME = os.getenv("INTEL_TTS_VOICE_NAME")
+TTS_RU_VOICE_NAME = os.getenv("INTEL_TTS_RU_VOICE_NAME", "Seva")
+TTS_EN_VOICE_NAME = os.getenv("INTEL_TTS_EN_VOICE_NAME", "David")
+TTS_RATE = int(os.getenv("INTEL_TTS_RATE", "2"))
+TTS_VOLUME = int(os.getenv("INTEL_TTS_VOLUME", "100"))
+TTS_MAX_CHARS = int(os.getenv("INTEL_TTS_MAX_CHARS", "280"))
 
 
 stt = FasterWhisperSTT(
@@ -120,6 +128,16 @@ def build_wake_handler(assistant: AssistantService) -> Callable[[], None]:
         try:
             answer = assistant.handle_text(user_message)
             print("Intel:", answer)
+            if TTS_ENABLED and answer:
+                speak_text(
+                    answer,
+                    voice_name=TTS_VOICE_NAME,
+                    rate=TTS_RATE,
+                    volume=TTS_VOLUME,
+                    max_chars=TTS_MAX_CHARS,
+                    ru_voice_name=TTS_RU_VOICE_NAME,
+                    en_voice_name=TTS_EN_VOICE_NAME,
+                )
         except Exception as exc:
             print(f"[Error] Assistant failed to process command: {exc}")
         finally:
