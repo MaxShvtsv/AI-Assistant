@@ -33,6 +33,7 @@ Runtime flow:
 - [utils/wakeword](/d:/Desktop/Development/AI-Assistant/utils/wakeword) - dataset and training utilities
 - [scripts/build_portable.py](/d:/Desktop/Development/AI-Assistant/scripts/build_portable.py) - portable build script for `py`
 - [scripts/build_portable.ps1](/d:/Desktop/Development/AI-Assistant/scripts/build_portable.ps1) - portable build script
+- installs tray app into Windows Startup
 - [Intel.spec](/d:/Desktop/Development/AI-Assistant/Intel.spec) - PyInstaller spec
 
 ## Prerequisites for development
@@ -47,6 +48,18 @@ Optional build dependency:
 
 ```powershell
 python -m pip install -r requirements-build.txt
+```
+
+Optional wakeword training dependencies:
+
+```powershell
+python -m pip install -r requirements-train.txt
+```
+
+Optional `.tflite` export dependencies:
+
+```powershell
+python -m pip install -r requirements-tflite.txt
 ```
 
 ## Environment configuration
@@ -86,6 +99,7 @@ The project is packaged as a one-folder Windows application. This is the recomme
 - audio and model assets stay readable next to the executable
 - `.env` remains editable after build
 - large binary dependencies behave more reliably than in one-file mode
+- runtime installation does not need training or TensorFlow export packages
 
 ### Build command
 
@@ -117,6 +131,7 @@ After a successful build, the portable folder will be:
 ```text
 dist\Intel\
   Intel.exe
+  IntelTray.exe
   .env
   README.md
   data\
@@ -138,8 +153,11 @@ You can move the entire `dist\Intel` folder to another Windows machine.
 4. Run:
 
 ```powershell
-.\Intel.exe
+.\IntelTray.exe
 ```
+
+Use `Intel.exe` when you want a console window for debugging.
+Use `IntelTray.exe` when you want Intel to work in the background from the system tray.
 
 ## What is included in the build
 
@@ -147,6 +165,8 @@ Packed into the portable app:
 
 - your Python runtime
 - Intel application code
+- `Intel.exe` for console/debug launches
+- `IntelTray.exe` for background tray launches
 - local tool implementations
 - sound cues from `data/sounds`
 - the wake word model from `data/wakeword/models`
@@ -311,3 +331,24 @@ Potential next steps for even better portability:
 - add an installer that checks Ollama, voices, and microphone access
 - add a zip export command for the full portable folder
 - replace SAPI TTS with a fully local bundled voice engine
+
+## Run Intel in the background on Windows startup
+
+The recommended background mode is `IntelTray.exe`.
+
+It starts Intel in the system tray and provides:
+
+- `Start`
+- `Stop`
+- `Open Folder`
+- `Exit`
+
+### Install tray auto-start
+
+After building the app:
+
+This creates a startup command file in the current user's Windows Startup folder and points it to:
+
+```text
+dist\Intel\IntelTray.exe
+```

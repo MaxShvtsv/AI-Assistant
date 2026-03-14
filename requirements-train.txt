@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Wakeword training
+torch>=2.2
+onnx>=1.16
+onnxscript==0.6.2

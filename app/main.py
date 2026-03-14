@@ -246,11 +246,8 @@ def _compute_audio_rms(audio: Optional[np.ndarray]) -> float:
     return float(np.sqrt(np.mean(np.square(samples))))
 
 
-def main() -> None:
-    assistant = AssistantService()
-
-    print("Intel is ready.")
-
+def create_listener(assistant: Optional[AssistantService] = None) -> WakeWordListener:
+    assistant = assistant or AssistantService()
     detector = OpenWakeWordDetector(
         wakeword_name=WAKEWORD_MODEL_KEY,
         threshold=WAKEWORD_THRESHOLD,
@@ -258,7 +255,7 @@ def main() -> None:
         download_models=WAKEWORD_MODEL_PATH is None,
     )
 
-    listener = WakeWordListener(
+    return WakeWordListener(
         detector=detector,
         wakeword_name=WAKEWORD_PHRASE,
         on_wake=build_wake_handler(assistant),
@@ -280,6 +277,12 @@ def main() -> None:
             pre_roll_chunks=WAKEWORD_PRE_ROLL_CHUNKS,
         ),
     )
+
+
+def main() -> None:
+    print("Intel is ready.")
+
+    listener = create_listener()
 
     if WAKEWORD_PHRASE.lower() != WAKEWORD_MODEL_KEY.lower() and not WAKEWORD_MODEL_PATH:
         print(

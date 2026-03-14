@@ -1,0 +1,6 @@
+-r requirements-train.txt
+
+# Optional: only needed if you want .tflite export from the trained ONNX model.
+# This stack is brittle on newer Python versions and is not required for Intel runtime.
+onnx-tf==1.10.0
+tensorflow-cpu>=2.16

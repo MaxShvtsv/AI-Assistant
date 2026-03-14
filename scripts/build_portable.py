@@ -39,7 +39,8 @@ def run() -> int:
     print("Next steps:")
     print(f"  1. Edit {env_path}")
     print("  2. Make sure Ollama + gemma3 are installed on the target machine")
-    print(f"  3. Run {dist_root / 'Intel.exe'}")
+    print(f"  3. Background mode: run {dist_root / 'IntelTray.exe'}")
+    print(f"  4. Debug mode: run {dist_root / 'Intel.exe'}")
 
     return 0
 

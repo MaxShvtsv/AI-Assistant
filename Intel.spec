@@ -32,7 +32,7 @@ excludes = [
 ]
 
 
-a = Analysis(
+console_analysis = Analysis(
     [str(APP_DIR / "main.py")],
     pathex=[str(APP_DIR)],
     binaries=[],
@@ -44,11 +44,11 @@ a = Analysis(
     excludes=excludes,
     noarchive=False,
 )
-pyz = PYZ(a.pure)
+console_pyz = PYZ(console_analysis.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
+console_exe = EXE(
+    console_pyz,
+    console_analysis.scripts,
     [],
     exclude_binaries=True,
     name="Intel",
@@ -59,10 +59,40 @@ exe = EXE(
     console=True,
 )
 
+tray_analysis = Analysis(
+    [str(APP_DIR / "tray_main.py")],
+    pathex=[str(APP_DIR)],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=excludes,
+    noarchive=False,
+)
+tray_pyz = PYZ(tray_analysis.pure)
+
+tray_exe = EXE(
+    tray_pyz,
+    tray_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="IntelTray",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+)
+
 coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
+    console_exe,
+    tray_exe,
+    console_analysis.binaries,
+    console_analysis.datas,
+    tray_analysis.binaries,
+    tray_analysis.datas,
     strip=False,
     upx=True,
     upx_exclude=[],

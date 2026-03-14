@@ -7,12 +7,5 @@ sounddevice==0.5.5
 openwakeword==0.6.0
 python-dotenv>=1.0
 requests>=2.31
-
-# Wakeword training
-torch>=2.2
-onnx>=1.16
-onnxscript==0.6.2
-
-# Optional: only needed if you want .tflite export from the trained ONNX model
-onnx-tf==1.10.0
-tensorflow-cpu>=2.16
+pystray>=0.19
+Pillow>=10.0
