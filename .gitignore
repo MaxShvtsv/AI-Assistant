@@ -10,6 +10,8 @@ data/input
 data/wakeword/raw/intel_positive/*.wav
 data/wakeword/raw/intel_negative/*.wav
 data/wakeword/prepared/*/*.wav
+data/wakeword/archive/*
+!data/wakeword/archive/.gitkeep
 
 # Training
-data/wakeword/features/intel/*.npy
+data/wakeword/features/intel*/*.npy

@@ -31,6 +31,7 @@ APP_ALIASES = {
 
 STATIC_APP_PATHS = {
     "steam": Path(r"D:\Program Files\Steam\steam.exe"),
+    "telegram": Path(r"D:\Program Files\Telegram Desktop\Telegram.exe"),
 }
 
 APP_PATHS_REGISTRY_PATHS = [

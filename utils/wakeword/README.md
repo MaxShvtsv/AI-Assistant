@@ -12,6 +12,8 @@ Place your raw WAV clips here:
   - clips with normal speech that do not contain the word `Intel`
 
 You can either copy WAV files there manually or record them with `record_dataset.py`.
+The recorder works in manual mode: press `Enter` once to start a clip and press
+`Enter` again to stop it.
 
 ## Recommended MVP dataset size
 
@@ -43,6 +45,18 @@ Record negative samples:
 ```powershell
 .\.venv\Scripts\python.exe utils\wakeword\record_dataset.py --label negative --count 100
 ```
+
+The recorder does not restart numbering from `001` on each run. It scans the target
+folder and continues from the next free index, so existing raw clips are preserved.
+
+If you want even safer filenames, add timestamps:
+
+```powershell
+.\.venv\Scripts\python.exe utils\wakeword\record_dataset.py --label positive --count 20 --timestamp-names
+```
+
+`--max-duration-sec` is only a safety limit in case you forget to stop a clip
+manually.
 
 Normalize and split the dataset:
 

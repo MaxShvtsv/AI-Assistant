@@ -22,6 +22,7 @@ class WakeWordConfig:
     min_consecutive_detections: int = 3
     debug_log_scores: bool = False
     debug_score_threshold: float = 0.15
+    detector_idle_reset_sec: float = 4.0
 
 
 class WakeWordListener:
@@ -42,6 +43,7 @@ class WakeWordListener:
         self._handling_wake = threading.Event()
         self._cooldown_until = 0.0
         self._consecutive_detections = 0
+        self._last_detector_activity_at = time.time()
 
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         if status:
@@ -81,9 +83,11 @@ class WakeWordListener:
                 # Ignore silence / very quiet noise before even asking the detector.
                 if chunk_rms < self.config.min_chunk_rms:
                     self._consecutive_detections = 0
+                    self._maybe_reset_detector_for_idle()
                     continue
 
                 score = self._predict_score(audio)
+                self._last_detector_activity_at = time.time()
 
                 if self.config.debug_log_scores and score >= self.config.debug_score_threshold:
                     print(
@@ -95,6 +99,7 @@ class WakeWordListener:
                     self._consecutive_detections += 1
                 else:
                     self._consecutive_detections = 0
+                    self._maybe_reset_detector_for_idle()
                     continue
 
                 if self._consecutive_detections >= self.config.min_consecutive_detections:
@@ -114,6 +119,7 @@ class WakeWordListener:
                         self._reset_detector()
                         self._clear_audio_queue()
                         self._handling_wake.clear()
+                        self._last_detector_activity_at = time.time()
                         print("[wakeword] resumed listening")
 
     def stop(self) -> None:
@@ -141,6 +147,17 @@ class WakeWordListener:
         reset_method = getattr(self.detector, "reset", None)
         if callable(reset_method):
             reset_method()
+
+    def _maybe_reset_detector_for_idle(self) -> None:
+        if self.config.detector_idle_reset_sec <= 0:
+            return
+
+        now = time.time()
+        if now - self._last_detector_activity_at < self.config.detector_idle_reset_sec:
+            return
+
+        self._reset_detector()
+        self._last_detector_activity_at = now
 
     @staticmethod
     def _compute_chunk_rms(audio: np.ndarray) -> float:

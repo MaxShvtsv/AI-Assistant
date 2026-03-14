@@ -19,13 +19,14 @@ from voice.wakeword.wakeword_listener import WakeWordConfig, WakeWordListener
 load_dotenv()
 
 BASE_INPUT_DIR = Path(r"D:\Desktop\Development\AI-Assistant\data\input")
-COMMAND_AUDIO_PATH = BASE_INPUT_DIR / "command.wav"
 WAKEWORD_PHRASE = os.getenv("INTEL_WAKEWORD_PHRASE", "Intel")
 WAKEWORD_MODEL_KEY = os.getenv("INTEL_WAKEWORD_MODEL_KEY", "assistant")
 WAKEWORD_MODEL_PATH = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
-WAKEWORD_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_THRESHOLD", "0.72"))
-WAKEWORD_MIN_RMS = float(os.getenv("INTEL_WAKEWORD_MIN_RMS", "180"))
+WAKEWORD_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_THRESHOLD", "0.58"))
+WAKEWORD_MIN_RMS = float(os.getenv("INTEL_WAKEWORD_MIN_RMS", "220"))
 WAKEWORD_MIN_CONSECUTIVE_HITS = int(os.getenv("INTEL_WAKEWORD_MIN_CONSECUTIVE_HITS", "2"))
+WAKEWORD_COOLDOWN_SEC = float(os.getenv("INTEL_WAKEWORD_COOLDOWN_SEC", "3.0"))
+WAKEWORD_IDLE_RESET_SEC = float(os.getenv("INTEL_WAKEWORD_IDLE_RESET_SEC", "4.0"))
 WAKEWORD_DEBUG = os.getenv("INTEL_WAKEWORD_DEBUG", "0") == "1"
 WAKEWORD_DEBUG_SCORE_THRESHOLD = float(os.getenv("INTEL_WAKEWORD_DEBUG_SCORE_THRESHOLD", "0.15"))
 REQUIRE_WAKEWORD_IN_TRANSCRIPT = os.getenv("INTEL_REQUIRE_WAKEWORD_IN_TRANSCRIPT", "0") == "1"
@@ -178,11 +179,12 @@ def main() -> None:
             dtype="int16",
             blocksize=1280,
             detection_threshold=WAKEWORD_THRESHOLD,
-            cooldown_sec=2.5,
+            cooldown_sec=WAKEWORD_COOLDOWN_SEC,
             min_chunk_rms=WAKEWORD_MIN_RMS,
             min_consecutive_detections=WAKEWORD_MIN_CONSECUTIVE_HITS,
             debug_log_scores=WAKEWORD_DEBUG,
             debug_score_threshold=WAKEWORD_DEBUG_SCORE_THRESHOLD,
+            detector_idle_reset_sec=WAKEWORD_IDLE_RESET_SEC,
         ),
     )
 
