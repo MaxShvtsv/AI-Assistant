@@ -172,6 +172,64 @@ TOOLS_SCHEMA = [
         },
     },
     {
+        "name": "open_browser_tab",
+        "description": "Open a new Google Chrome tab with a direct URL or a web search query.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Direct URL to open in a new Chrome tab",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Web search query to open in Google search if no direct URL is provided",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "switch_browser_tab",
+        "description": "Switch the active Google Chrome tab by direction, numeric index, or partial tab title.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "direction": {
+                    "type": "string",
+                    "description": "Use values like next or previous",
+                },
+                "index": {
+                    "type": "integer",
+                    "description": "Chrome tab index from 1 to 9",
+                },
+                "title_contains": {
+                    "type": "string",
+                    "description": "Partial tab title to activate when Chrome DevTools tab discovery is available",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "youtube_music_control",
+        "description": "Control YouTube Music in Google Chrome. Supported actions: open, search, play_song, play_pause, play, pause, next_track, previous_track.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "One of: open, search, play_song, play_pause, play, pause, next_track, previous_track",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Song name or search text for actions like search and play_song",
+                },
+            },
+            "required": ["action"],
+        },
+    },
+    {
         "name": "list_available_apps",
         "description": "List discovered launchable desktop applications from the Windows app catalog.",
         "parameters": {
