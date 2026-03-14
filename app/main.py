@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from core.assistant_service import AssistantService
 from voice.input.audio_recorder import record_command_until_silence
+from voice.sound_cues import play_audio_cue
 from voice.input.stt_faster_whisper import FasterWhisperSTT
 from voice.wakeword.openwakeword_detector import OpenWakeWordDetector
 from voice.wakeword.wakeword_listener import WakeWordConfig, WakeWordListener
@@ -19,6 +20,8 @@ from voice.wakeword.wakeword_listener import WakeWordConfig, WakeWordListener
 load_dotenv()
 
 BASE_INPUT_DIR = Path(r"D:\Desktop\Development\AI-Assistant\data\input")
+DEFAULT_START_CUE_PATH = r"D:\Desktop\Development\AI-Assistant\data\sounds\inter_start.wav"
+DEFAULT_END_CUE_PATH = r"D:\Desktop\Development\AI-Assistant\data\sounds\inter_end.wav"
 WAKEWORD_PHRASE = os.getenv("INTEL_WAKEWORD_PHRASE", "Intel")
 WAKEWORD_MODEL_KEY = os.getenv("INTEL_WAKEWORD_MODEL_KEY", "assistant")
 WAKEWORD_MODEL_PATH = os.getenv("INTEL_WAKEWORD_MODEL_PATH")
@@ -40,6 +43,8 @@ STT_BEAM_SIZE = int(os.getenv("INTEL_STT_BEAM_SIZE", "7"))
 STT_BEST_OF = int(os.getenv("INTEL_STT_BEST_OF", "5"))
 STT_TEMPERATURE = float(os.getenv("INTEL_STT_TEMPERATURE", "0.0"))
 STT_VAD_MIN_SILENCE_MS = int(os.getenv("INTEL_STT_VAD_MIN_SILENCE_MS", "500"))
+COMMAND_START_CUE_PATH = os.getenv("INTEL_COMMAND_START_CUE_PATH", DEFAULT_START_CUE_PATH)
+COMMAND_END_CUE_PATH = os.getenv("INTEL_COMMAND_END_CUE_PATH", DEFAULT_END_CUE_PATH)
 
 
 stt = FasterWhisperSTT(
@@ -59,6 +64,7 @@ def recognize_speech_from_command_audio() -> str:
     BASE_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     command_audio_path = BASE_INPUT_DIR / f"command_{int(time.time() * 1000)}.wav"
 
+    play_audio_cue(COMMAND_START_CUE_PATH, wait=True)
     wav_path = record_command_until_silence(
         output_path=str(command_audio_path),
         sample_rate=16000,
@@ -70,6 +76,7 @@ def recognize_speech_from_command_audio() -> str:
         silence_duration_sec=COMMAND_SILENCE_DURATION_SEC,
         max_duration_sec=COMMAND_MAX_DURATION_SEC,
     )
+    play_audio_cue(COMMAND_END_CUE_PATH, wait=False)
 
     return stt.transcribe_file(wav_path).strip()
 

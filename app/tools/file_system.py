@@ -172,11 +172,16 @@ def move_path(source_path: Optional[str] = None, destination_path: Optional[str]
 
 
 def _resolve_path(path: str) -> Path:
-    normalized_drive = _try_parse_drive_path(path)
+    raw_path = path.strip().strip("\"'")
+
+    spoken_drive_path = _try_parse_spoken_drive_path(raw_path)
+    if spoken_drive_path is not None:
+        return spoken_drive_path
+
+    normalized_drive = _try_parse_drive_path(raw_path)
     if normalized_drive is not None:
         return normalized_drive
 
-    raw_path = path.strip().strip("\"'")
     candidate = Path(raw_path).expanduser()
     if candidate.is_absolute():
         return candidate
@@ -191,3 +196,25 @@ def _try_parse_drive_path(path: str) -> Optional[Path]:
 
     drive_letter = match.group(1).upper()
     return Path(f"{drive_letter}:\\")
+
+
+def _try_parse_spoken_drive_path(path: str) -> Optional[Path]:
+    cleaned = path.strip().strip("\"'")
+    match = re.fullmatch(
+        r"(?is)(?:disk|drive|диск)?\s*([a-z])\s*[:,]?\s+(.+?)\s*",
+        cleaned,
+    )
+    if not match:
+        return None
+
+    drive_letter = match.group(1).upper()
+    tail = match.group(2).strip()
+    if not tail:
+        return Path(f"{drive_letter}:\\")
+
+    parts = [segment.strip(" .,:;\\/") for segment in re.split(r"[\\/,\n]+", tail)]
+    normalized_parts = [part for part in parts if part]
+    if not normalized_parts:
+        return Path(f"{drive_letter}:\\")
+
+    return Path(f"{drive_letter}:\\", *normalized_parts)

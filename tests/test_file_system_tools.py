@@ -46,3 +46,11 @@ def test_resolve_path_supports_drive_aliases() -> None:
 
     assert str(drive_c).lower().startswith("c:")
     assert str(drive_d).lower().startswith("d:")
+
+
+def test_resolve_path_supports_spoken_drive_paths() -> None:
+    spoken_path = file_system._resolve_path("D, Games")
+    russian_spoken_path = file_system._resolve_path("диск d steam")
+
+    assert str(spoken_path).lower().startswith("d:\\games")
+    assert str(russian_spoken_path).lower().startswith("d:\\steam")
