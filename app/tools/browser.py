@@ -4,6 +4,7 @@ import json
 import subprocess
 import time
 import urllib.parse
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,7 @@ from tools.applications import resolve_app_match
 CHROME_APP_NAME = "Google Chrome"
 YOUTUBE_MUSIC_URL = "https://music.youtube.com"
 CHROME_DEVTOOLS_PORT = 9222
+DEVTOOLS_SESSION = requests.Session()
 
 
 def open_browser_tab(url: Optional[str] = None, query: Optional[str] = None) -> str:
@@ -125,6 +127,7 @@ def _launch_chrome(arguments: list[str]) -> None:
     subprocess.Popen([chrome_path, *arguments])
 
 
+@lru_cache(maxsize=1)
 def _get_chrome_path() -> str:
     chrome_entry = resolve_app_match(CHROME_APP_NAME) or resolve_app_match("chrome")
     if chrome_entry is None:
@@ -198,7 +201,7 @@ def _activate_tab_by_title(title_contains: str) -> bool:
     if tab is None:
         return False
 
-    requests.get(
+    DEVTOOLS_SESSION.get(
         f"http://127.0.0.1:{CHROME_DEVTOOLS_PORT}/json/activate/{tab['id']}",
         timeout=1.5,
     )
@@ -207,7 +210,7 @@ def _activate_tab_by_title(title_contains: str) -> bool:
 
 def _find_devtools_tab_by_title(title_contains: str) -> Optional[dict]:
     try:
-        response = requests.get(
+        response = DEVTOOLS_SESSION.get(
             f"http://127.0.0.1:{CHROME_DEVTOOLS_PORT}/json/list",
             timeout=1.5,
         )

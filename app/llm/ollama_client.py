@@ -1,5 +1,7 @@
-from dataclasses import dataclass
-from typing import Optional
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 from ollama import Client
 
@@ -9,6 +11,8 @@ class OllamaConfig:
     host: str = "http://localhost:11434"
     model: str = "gemma3"
     system_prompt: Optional[str] = None
+    keep_alive: str = "30m"
+    options: dict[str, Any] = field(default_factory=lambda: {"temperature": 0})
 
 
 class OllamaClient:
@@ -16,7 +20,12 @@ class OllamaClient:
         self.config = config
         self.client = Client(host=config.host)
 
-    def chat(self, user_message: str, system_prompt: Optional[str] = None) -> str:
+    def chat(
+        self,
+        user_message: str,
+        system_prompt: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+    ) -> str:
         messages = []
 
         effective_system_prompt = system_prompt or self.config.system_prompt
@@ -35,9 +44,15 @@ class OllamaClient:
             }
         )
 
+        effective_options = dict(self.config.options)
+        if options:
+            effective_options.update(options)
+
         response = self.client.chat(
             model=self.config.model,
             messages=messages,
+            keep_alive=self.config.keep_alive,
+            options=effective_options,
         )
 
         return response["message"]["content"].strip()

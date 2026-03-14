@@ -30,24 +30,17 @@ DEFAULT_INITIAL_PROMPT = (
 class FasterWhisperSTT:
     def __init__(
         self,
-        model_size: str = "medium",
+        model_size: str = "small",
         device: str = "cpu",
         compute_type: str = "int8",
         language: Optional[str] = "ru",
-        beam_size: int = 7,
-        best_of: int = 5,
+        beam_size: int = 5,
+        best_of: int = 3,
         temperature: float = 0.0,
         vad_filter: bool = True,
         vad_min_silence_duration_ms: int = 500,
         initial_prompt: Optional[str] = DEFAULT_INITIAL_PROMPT,
     ):
-        """
-        model_size examples: tiny, base, small, medium, large-v3, large-v3-turbo
-        device: 'cpu' or 'cuda'
-        compute_type examples:
-            CPU  -> int8
-            GPU  -> float16 / int8_float16
-        """
         self.language = language
         self.beam_size = beam_size
         self.best_of = best_of
@@ -63,12 +56,11 @@ class FasterWhisperSTT:
         )
 
     def transcribe_file(self, audio_path: str) -> str:
-        """Transcribe audio file and return plain text."""
         path = Path(audio_path)
         if not path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-        segments, info = self.model.transcribe(
+        segments, _ = self.model.transcribe(
             str(path),
             language=self.language,
             vad_filter=self.vad_filter,
@@ -82,10 +74,8 @@ class FasterWhisperSTT:
             initial_prompt=self.initial_prompt,
         )
 
-        parts = []
-        for segment in segments:
-            text = segment.text.strip()
-            if text:
-                parts.append(text)
-
-        return " ".join(parts).strip()
+        return " ".join(
+            segment.text.strip()
+            for segment in segments
+            if segment.text and segment.text.strip()
+        ).strip()
