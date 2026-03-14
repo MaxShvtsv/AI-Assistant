@@ -64,6 +64,10 @@ class OpenWakeWordDetector:
 
             # openWakeWord accepts a list of model paths.
             kwargs["wakeword_models"] = [str(model_file)]
+            if model_file.suffix.lower() == ".onnx":
+                kwargs["inference_framework"] = "onnx"
+            elif model_file.suffix.lower() == ".tflite":
+                kwargs["inference_framework"] = "tflite"
 
         return Model(**kwargs)
 

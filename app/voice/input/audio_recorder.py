@@ -75,8 +75,29 @@ def record_command_until_silence(
         raise RuntimeError("No audio frames were captured for the command")
 
     audio = np.concatenate(frames, axis=0)
+    audio = _normalize_audio(audio)
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     write(output, sample_rate, audio)
     print(f"[record] saved command audio to: {output.resolve()}")
     return str(output.resolve())
+
+
+def _normalize_audio(audio: np.ndarray, target_peak: int = 20000) -> np.ndarray:
+    samples = np.asarray(audio)
+    if samples.dtype != np.int16:
+        samples = samples.astype(np.int16)
+
+    if samples.size == 0:
+        return samples
+
+    centered = samples.astype(np.float32)
+    centered -= centered.mean(axis=0, keepdims=True)
+
+    peak = float(np.max(np.abs(centered)))
+    if peak < 1.0:
+        return centered.astype(np.int16)
+
+    scale = min(target_peak / peak, 4.0)
+    normalized = np.clip(centered * scale, -32768, 32767)
+    return normalized.astype(np.int16)
